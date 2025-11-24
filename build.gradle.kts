@@ -22,7 +22,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "app.codcoll.MainKt"
+        mainClass = "app.codcoll.CodCollGUIKt"
 
         nativeDistributions {
             packageName = "Code collector"
