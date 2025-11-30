@@ -1,6 +1,6 @@
-package app.codcoll
-
 // CodCollGUI.kt
+
+package app.codcoll
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
@@ -20,13 +20,13 @@ import androidx.compose.ui.window.application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import java.io.File
+import javax.swing.JFileChooser
 
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "CodColl - Code Collector",
-        // Задаем минимальный размер окна
         state = androidx.compose.ui.window.rememberWindowState(
             width = 800.dp,
             height = 600.dp
@@ -39,30 +39,16 @@ fun main() = application {
 @Composable
 @Preview
 fun App() {
-    // 1. Состояние для отображения логов и статуса
     var logText by remember { mutableStateOf("") }
-    // 2. Состояние для управления активностью кнопки (блокировка во время работы)
     var isCollecting by remember { mutableStateOf(false) }
+    var selectedFolder by remember { mutableStateOf<File?>(null) }
 
-    // CoroutineScope позволяет запускать асинхронные задачи
     val coroutineScope = rememberCoroutineScope()
-
-    // Функция для инициализации: создание папки и файла paths.txt
-    fun initialize() {
-        // Мы вызываем логику подготовки и сразу отображаем результат в логе
-        logText = CodeCollector.prepareServiceFolderAndInputFile()
-        logText += "\n\n---\n\nНажмите 'Собрать код' для запуска процесса сбора."
-    }
-
-    // LaunchedEffect запускает инициализацию только один раз при старте
-    LaunchedEffect(Unit) {
-        initialize()
-    }
 
     MaterialTheme {
         Scaffold(
             topBar = {
-                TopAppBar(title = { Text("CodColl - Сборщик кода проекта (Kotlin Compose)") })
+                TopAppBar(title = { Text("CodColl - Сборщик кода проекта (Kotlin)") })
             }
         ) { padding ->
             Column(
@@ -73,9 +59,10 @@ fun App() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                // Информация о служебной папке и файле путей
+                // текущая папка
                 Text(
-                    text = "Служебная папка: ${CodeCollector.serviceFolder.absolutePath}",
+                    text = "Выбранная папка: " +
+                            (selectedFolder?.absolutePath ?: "не выбрано"),
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start,
                     style = MaterialTheme.typography.subtitle2.copy(color = Color.Gray)
@@ -83,30 +70,52 @@ fun App() {
 
                 Spacer(Modifier.height(16.dp))
 
-                // Кнопка запуска с индикатором
+                // кнопка выбора папки
                 Button(
                     onClick = {
-                        // Запускаем сбор кода в корутине, чтобы не блокировать поток UI
-                        coroutineScope.launch {
-                            isCollecting = true
-                            logText += "\n\n⏳ Идет сборка кода... Пожалуйста, подождите.\n"
+                        val chooser = JFileChooser().apply {
+                            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                        }
+                        val result = chooser.showOpenDialog(null)
 
-                            // withContext(Dispatchers.IO) - ВАЖНО!
-                            // Переключаемся на поток ввода/вывода, т.к. работа с файлами долгая.
-                            val resultLog = withContext(Dispatchers.IO) {
-                                CodeCollector.collectCode()
+                        if (result == JFileChooser.APPROVE_OPTION) {
+                            selectedFolder = chooser.selectedFile
+                            logText += "\n📁 Папка выбрана: ${selectedFolder!!.absolutePath}\n"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text("Выбрать папку")
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // кнопка "собрать код"
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            if (selectedFolder == null) {
+                                logText += "\n⚠️ Сначала выберите папку!\n"
+                                return@launch
                             }
-                            logText += resultLog
+
+                            isCollecting = true
+                            logText += "\n⏳ Поиск файлов и сбор кода...\n"
+
+                            val result = withContext(Dispatchers.IO) {
+                                CodeCollector.collectCodeFromFolder(selectedFolder!!)
+                            }
+
+                            logText += result
                             isCollecting = false
                         }
                     },
-                    enabled = !isCollecting, // Кнопка неактивна во время сборки
+                    enabled = !isCollecting,
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
                     Text(if (isCollecting) "Сборка..." else "Собрать код")
                     if (isCollecting) {
                         Spacer(Modifier.width(8.dp))
-                        // Индикатор прогресса
                         CircularProgressIndicator(
                             color = Color.White,
                             modifier = Modifier.size(24.dp),
@@ -117,7 +126,6 @@ fun App() {
 
                 Spacer(Modifier.height(16.dp))
 
-                // Лог-окно
                 Text(
                     text = "Лог выполнения:",
                     modifier = Modifier.fillMaxWidth(),
@@ -131,7 +139,6 @@ fun App() {
                     elevation = 4.dp,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Используем rememberScrollState и verticalScroll для прокрутки
                     val scrollState = rememberScrollState()
                     Text(
                         text = logText,
@@ -140,9 +147,8 @@ fun App() {
                             .background(Color.Black.copy(alpha = 0.9f))
                             .padding(8.dp)
                             .verticalScroll(scrollState),
-                        color = Color(0xFF00FF00), // Зеленый цвет для стилизации
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.caption
+                        color = Color(0xFF00FF00),
+                        fontFamily = FontFamily.Monospace
                     )
                 }
             }

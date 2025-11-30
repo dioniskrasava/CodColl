@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "app.codcoll"
-version = "1.0-SNAPSHOT"
+version = "2.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -26,8 +26,8 @@ compose.desktop {
 
         nativeDistributions {
             packageName = "Code collector"
-            packageVersion = "1.0."
-            description = "(v 1.0.) Сборщик кода для AI чатов"
+            packageVersion = "2.0."
+            description = "(v 2.0.) Сборщик кода для AI чатов"
 
             linux {
                 appCategory = "Utility"
