@@ -4,6 +4,7 @@ package app.codcoll
 
 import java.io.File
 import java.nio.file.Paths
+import kotlin.text.RegexOption // Импорт, необходимый для использования DOT_MATCHES_ALL
 
 object CodeCollector {
 
@@ -15,8 +16,29 @@ object CodeCollector {
     private val serviceFolder = File(currentDir, SERVICE_FOLDER_NAME)
     private val outputFile = File(serviceFolder, OUTPUT_FILE_NAME)
 
+    private val pathFile = File(serviceFolder, "path.txt")
+
     init {
         if (!serviceFolder.exists()) serviceFolder.mkdirs()
+    }
+
+
+    fun saveSelectedPath(path: String) {
+        try {
+            pathFile.writeText(path)
+        } catch (e: Exception) {
+            // игнорируем ошибки записи
+        }
+    }
+
+    fun loadSelectedPath(): String? {
+        return try {
+            if (pathFile.exists()) {
+                pathFile.readText().takeIf { it.isNotBlank() && File(it).exists() }
+            } else null
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /**
@@ -26,6 +48,37 @@ object CodeCollector {
         folder.walkTopDown()
             .filter { it.isFile && (it.extension == "kt" || it.extension == "kts") }
             .toList()
+
+    /**
+     * Удаляет из строки кода комментарии (однострочные // и многострочные /*...*/)
+     * и KDoc/Javadoc (/**...*/).
+     *
+     * @param code Исходный код файла.
+     * @return Код, очищенный от комментариев и пустых строк.
+     */
+    private fun removeComments(code: String): String {
+        // Шаг 1: Удаляем все многострочные комментарии (включая Javadoc/KDoc)
+        // Используем исправленную константу: RegexOption.DOT_MATCHES_ALL
+        val noBlockComments = code.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "")
+
+        // Шаг 2: Обрабатываем однострочные комментарии
+        return noBlockComments.split('\n')
+            .joinToString("\n") { line ->
+                // Ищем индекс начала однострочного комментария
+                val commentIndex = line.indexOf("//")
+
+                if (commentIndex == -1) {
+                    // Комментария нет, возвращаем строку как есть
+                    line
+                } else {
+                    // Убираем комментарий и лишние пробелы в конце
+                    line.substring(0, commentIndex).trimEnd()
+                }
+            }
+            .lines()
+            .filter { it.isNotBlank() } // Шаг 3: Убираем пустые строки, оставшиеся после удаления комментариев
+            .joinToString("\n")
+    }
 
     /**
      * Основная функция
@@ -53,12 +106,24 @@ object CodeCollector {
 
         files.forEach { file ->
             try {
-                output.append("Файл: ${file.absolutePath}\n\n")
-                output.append(file.readText())
-                output.append(SEPARATOR)
+                // 1. Читаем весь текст
+                val fullText = file.readText()
 
-                count++
-                log.append("✅ Добавлен: ${file.name}\n")
+                // 2. !!! ПРИМЕНЯЕМ ФИЛЬТРАЦИЮ !!!
+                val codeWithoutComments = removeComments(fullText)
+
+                if (codeWithoutComments.isNotBlank()) {
+                    // Добавляем файл, только если в нем остался код
+                    output.append("Файл: ${file.absolutePath}\n\n")
+                    output.append(codeWithoutComments) // Добавляем очищенный код
+                    output.append(SEPARATOR)
+
+                    count++
+                    log.append("✅ Добавлен (очищен от комментариев): ${file.name}\n")
+                } else {
+                    // Если файл содержал только комментарии, мы его пропускаем
+                    log.append("➖ Пропущен (содержит только комментарии): ${file.name}\n")
+                }
             } catch (e: Exception) {
                 log.append("❌ Ошибка чтения: ${file.absolutePath}: ${e.message}\n")
             }

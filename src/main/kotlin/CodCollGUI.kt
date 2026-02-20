@@ -42,14 +42,20 @@ fun App() {
     var logText by remember { mutableStateOf("") }
     var isCollecting by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<File?>(null) }
-
     val coroutineScope = rememberCoroutineScope()
+
+    // --- Загрузка сохранённого пути при запуске ---
+    LaunchedEffect(Unit) {
+        val savedPath = CodeCollector.loadSelectedPath()
+        if (savedPath != null) {
+            selectedFolder = File(savedPath)
+            logText += "🔄 Восстановлен предыдущий путь: $savedPath\n"
+        }
+    }
 
     MaterialTheme {
         Scaffold(
-            topBar = {
-                TopAppBar(title = { Text("CodColl - Сборщик кода проекта (Kotlin)") })
-            }
+            topBar = { TopAppBar(title = { Text("CodColl - Сборщик кода проекта (Kotlin)") }) }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -58,8 +64,6 @@ fun App() {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
-                // текущая папка
                 Text(
                     text = "Выбранная папка: " +
                             (selectedFolder?.absolutePath ?: "не выбрано"),
@@ -67,19 +71,18 @@ fun App() {
                     textAlign = TextAlign.Start,
                     style = MaterialTheme.typography.subtitle2.copy(color = Color.Gray)
                 )
-
                 Spacer(Modifier.height(16.dp))
 
-                // кнопка выбора папки
                 Button(
                     onClick = {
                         val chooser = JFileChooser().apply {
                             fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
                         }
                         val result = chooser.showOpenDialog(null)
-
                         if (result == JFileChooser.APPROVE_OPTION) {
                             selectedFolder = chooser.selectedFile
+                            // --- Сохраняем выбранный путь ---
+                            CodeCollector.saveSelectedPath(selectedFolder!!.absolutePath)
                             logText += "\n📁 Папка выбрана: ${selectedFolder!!.absolutePath}\n"
                         }
                     },
@@ -90,7 +93,6 @@ fun App() {
 
                 Spacer(Modifier.height(16.dp))
 
-                // кнопка "собрать код"
                 Button(
                     onClick = {
                         coroutineScope.launch {
@@ -98,14 +100,11 @@ fun App() {
                                 logText += "\n⚠️ Сначала выберите папку!\n"
                                 return@launch
                             }
-
                             isCollecting = true
                             logText += "\n⏳ Поиск файлов и сбор кода...\n"
-
                             val result = withContext(Dispatchers.IO) {
                                 CodeCollector.collectCodeFromFolder(selectedFolder!!)
                             }
-
                             logText += result
                             isCollecting = false
                         }
@@ -125,16 +124,13 @@ fun App() {
                 }
 
                 Spacer(Modifier.height(16.dp))
-
                 Text(
                     text = "Лог выполнения:",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start,
                     style = MaterialTheme.typography.subtitle1
                 )
-
                 Spacer(Modifier.height(8.dp))
-
                 Card(
                     elevation = 4.dp,
                     modifier = Modifier.fillMaxSize()
