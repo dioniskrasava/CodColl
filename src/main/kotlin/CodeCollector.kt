@@ -123,4 +123,7 @@ object CodeCollector {
             log.toString()
         }
     }
+
+    fun getOutputFilePath(): String = outputFile.absolutePath
 }
+

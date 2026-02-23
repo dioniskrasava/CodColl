@@ -18,6 +18,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
     implementation(compose.materialIconsExtended)
+    implementation(compose.material)  // явно добавляем material
+    implementation(compose.materialIconsExtended)
 }
 
 compose.desktop {

@@ -1,5 +1,3 @@
-// CodCollGUI.kt
-
 package app.codcoll
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
@@ -8,10 +6,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,15 +39,16 @@ fun main() = application {
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Composable
 @Preview
 fun App() {
     var logText by remember { mutableStateOf("") }
     var isCollecting by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<File?>(null) }
+    var showHelpDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    // --- Загрузка сохранённого пути при запуске ---
     LaunchedEffect(Unit) {
         val savedPath = CodeCollector.loadSelectedPath()
         if (savedPath != null) {
@@ -55,7 +59,21 @@ fun App() {
 
     MaterialTheme {
         Scaffold(
-            topBar = { TopAppBar(title = { Text("CodColl - Сборщик кода проекта (Kotlin)") }) }
+            topBar = {
+                TopAppBar(
+                    title = { Text("CodColl - Сборщик кода проекта (Kotlin)") },
+                    actions = {
+                        IconButton(
+                            onClick = { showHelpDialog = true },
+                            modifier = Modifier.onPointerEvent(PointerEventType.Enter) {
+                                // Запустить задержку показа тултипа
+                            }
+                        ) {
+                            Icon(Icons.Default.Help, contentDescription = "Справка")
+                        }
+                    }
+                )
+            }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -72,7 +90,6 @@ fun App() {
                     style = MaterialTheme.typography.subtitle2.copy(color = Color.Gray)
                 )
                 Spacer(Modifier.height(16.dp))
-
                 Button(
                     onClick = {
                         val chooser = JFileChooser().apply {
@@ -81,7 +98,6 @@ fun App() {
                         val result = chooser.showOpenDialog(null)
                         if (result == JFileChooser.APPROVE_OPTION) {
                             selectedFolder = chooser.selectedFile
-                            // --- Сохраняем выбранный путь ---
                             CodeCollector.saveSelectedPath(selectedFolder!!.absolutePath)
                             logText += "\n📁 Папка выбрана: ${selectedFolder!!.absolutePath}\n"
                         }
@@ -90,9 +106,7 @@ fun App() {
                 ) {
                     Text("Выбрать папку")
                 }
-
                 Spacer(Modifier.height(16.dp))
-
                 Button(
                     onClick = {
                         coroutineScope.launch {
@@ -122,7 +136,6 @@ fun App() {
                         )
                     }
                 }
-
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Лог выполнения:",
@@ -149,5 +162,34 @@ fun App() {
                 }
             }
         }
+    }
+
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = { Text("О программе CodColl") },
+            text = {
+                Text(
+                    buildString {
+                        appendLine("CodColl — утилита для сбора исходного кода Kotlin-проектов в один текстовый файл.")
+                        appendLine()
+                        appendLine("• Сканирует указанную папку и находит все файлы с расширениями .kt и .kts")
+                        appendLine("• Удаляет комментарии (//, /* */) и пустые строки")
+                        appendLine("• Подсчитывает количество строк кода с учётом импортов и без них")
+                        appendLine("• Сохраняет результат в файл:")
+                        appendLine("  ${CodeCollector.getOutputFilePath()} (в папке CodColl рядом с программой)")
+                        appendLine()
+                        appendLine("Статистика строк выводится в лог после завершения сбора.")
+                        appendLine()
+                        appendLine("Вы можете выбрать папку, и программа запомнит её для следующего запуска.")
+                    }
+                )
+            },
+            confirmButton = {
+                Button(onClick = { showHelpDialog = false }) {
+                    Text("Закрыть")
+                }
+            }
+        )
     }
 }
